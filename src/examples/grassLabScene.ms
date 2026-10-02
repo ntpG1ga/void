@@ -118,7 +118,9 @@ import {
 	labCapture,
 	labExit,
 } from "./labio.h";
-import { initHudHome, frameHudHome } from "./hudHome";
+import { initHudHome, frameHudHome, takeGalleryRequest } from "./hudHome";
+import { initGallery, frameGallery, takeHomeRequest } from "../ui/kit/gallery";
+import { setup2d } from "../void2d/draw";
 import { skipNextCommit } from "../sokol/gpu";
 
 @include("../sokol/bridge.h");
@@ -1742,8 +1744,10 @@ function setup(): boolean {
 	return true;
 }
 
-// The Hibernal Home HUD (hudHome.ms) drawn over the scene; LAB_HUD=0 turns it off.
+// The Hibernal HUD over the scene: LAB_HUD=1 the Home screen (hudHome.ms), 2 the UI kit
+// gallery (ui/kit/gallery.ms), 0 none.
 let hudWanted: boolean = true;
+let hudMode: int32 = 1 as int32;
 
 export function initLab(): void {
 	gfxSetup();
@@ -1754,7 +1758,8 @@ export function initLab(): void {
 	rampLook = labEnvInt("LAB_RAMP", 1) != 0;
 	walkerWanted = labEnvInt("LAB_WALKER", 1) != 0;
 	particlesWanted = labEnvInt("LAB_PARTICLES", 1) != 0;
-	hudWanted = labEnvInt("LAB_HUD", 1) != 0;
+	hudMode = labEnvInt("LAB_HUD", 1);
+	hudWanted = hudMode != 0;
 	snowWanted = labEnvInt("LAB_SNOW", 0) != 0;
 	walkerFx = labEnvInt("LAB_WALKER_FX", 1) != 0;
 	zoomOut = (labEnvInt("LAB_ZOOM", DEFAULT_ZOOM) as float32) / 100.0;
@@ -1770,7 +1775,11 @@ export function initLab(): void {
 	}
 	ready = setup();
 	// after the scene: its gfxSetup is done and the HUD's assets load inside the asset root
-	if (ready && hudWanted) { initHudHome(); }
+	if (ready && hudWanted) {
+		setup2d();
+		initHudHome();
+		initGallery();
+	}
 }
 
 // The fire: a new light position and power every FLICKER_EVERY frames, the flame sprite a new
@@ -1931,7 +1940,13 @@ export function frameLab(): void {
 	}
 	if (hudWanted) { skipNextCommit(); }
 	renderFrame(renderer, context, sceneItems, cameraParams, lightParams, shifted.value);
-	if (hudWanted) { frameHudHome(); }
+	if (hudMode == 1) {
+		frameHudHome();
+		if (takeGalleryRequest()) { hudMode = 2 as int32; }
+	} else if (hudMode == 2) {
+		frameGallery();
+		if (takeHomeRequest()) { hudMode = 1 as int32; }
+	}
 
 	if (captureAt >= 0) {
 		const out: string = "out/shots/";

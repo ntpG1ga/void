@@ -7,7 +7,6 @@
 // and the HUD's 2D pass loads the 3D image instead of clearing it (loadNextPass).
 
 import { makeImage, makeView, loadNextPass } from "../sokol/gpu";
-import { setup2d } from "../void2d/draw";
 import { Node2D, sprite, at, addChildAt } from "../void2d/node";
 import { rgba, tile, Color } from "../void2d/types";
 import { addFont } from "../void2d/labelText";
@@ -51,8 +50,16 @@ function chrome(name: string, x: float32, y: float32, w: float32, h: float32): N
 	return sprite(tile(view, w, h)).at(x, y);
 }
 
+// The gear opens the UI kit gallery until Settings exists; the caller polls this.
+let galleryAsked: boolean = false;
+export function takeGalleryRequest(): boolean {
+	const asked: boolean = galleryAsked;
+	galleryAsked = false;
+	return asked;
+}
+
+// setup2d is the caller's (once, before any HUD screen).
 export function initHudHome(): void {
-	setup2d();
 	silk = addFont(HUD_DIR + "Silkscreen-Regular.ttf");
 	const u = createUi(rgba(0.0, 0.0, 0.0, 1.0));
 	// chrome under the live boxes and labels
@@ -96,8 +103,8 @@ export function frameHudHome(): void {
 	say(u, AGE, "D34", 100.0, 112.0, 48.0, 8.0, TEXT_LIGHT, 1.0);
 
 	// badge numbers
-	say(u, WINTER, "12", 304.0, 108.0, 40.0, 8.0, TEXT_LIGHT, 0.5);
-	say(u, GROWTH, "X1.1", 304.0, 156.0, 40.0, 8.0, TEXT_LIGHT, 0.5);
+	say(u, WINTER, "12", 304.0, 106.0, 40.0, 8.0, TEXT_LIGHT, 0.5);
+	say(u, GROWTH, "X1.1", 304.0, 154.0, 40.0, 8.0, TEXT_LIGHT, 0.5);
 
 	// toast: frameless strip, one at a time
 	if (toastLeft > 0) {
@@ -118,6 +125,9 @@ export function frameHudHome(): void {
 			showToast("NO MORE BONDING TODAY");
 		}
 	}
+
+	// gear: 48 x 48 target round the 36 px box at the top right
+	if (pressable(u, 30, DESIGN_W - 12.0 - 48.0, 28.0, 48.0, 48.0)) { galleryAsked = true; }
 
 	// dock labels (icons, frame and the Home underline are baked)
 	const names: string[] = ["HOME", "PET", "BLOCK", "SHOP", "DIGEST"];
