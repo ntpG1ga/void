@@ -51,6 +51,12 @@ export interface Ui {
 	// The widget that took the current press. A press belongs to the widget it started on,
 	// so sliding onto another widget and lifting there does not press that one.
 	activeId: int32;
+	// Overlay layer (sheets, modals): drawn above everything else, and while `blockBase` is
+	// set only overlay widgets take touches. The kit adds its own layers in the same order.
+	boxesTop: Node2D;
+	textsTop: Node2D;
+	overlay: boolean;
+	blockBase: boolean;
 }
 
 export function createUi(clearColor: Color): Ui {
@@ -61,13 +67,18 @@ export function createUi(clearColor: Color): Ui {
 	sc.setScaleMode(ScaleMode.LetterBox, DESIGN_W, DESIGN_H);
 	const boxes = graphics();
 	const texts = group();
+	const boxesTop = graphics();
+	const textsTop = group();
 	sc.add(boxes);
 	sc.add(texts);
+	sc.add(boxesTop);
+	sc.add(textsTop);
 	return {
 		sc: sc, boxes: boxes, texts: texts, labelIds: [], labelNodes: [], labelUsed: [],
 		pointerId: NO_POINTER, down: false, x: 0.0, y: 0.0,
 		pressed: false, pressX: 0.0, pressY: 0.0, released: false, releaseX: 0.0, releaseY: 0.0,
 		activeId: NO_WIDGET,
+		boxesTop: boxesTop, textsTop: textsTop, overlay: false, blockBase: false,
 	};
 }
 
@@ -153,6 +164,8 @@ export function beginUi(ui: Ui): void {
 		};
 	}
 	ui.boxes.clear();
+	ui.boxesTop.clear();
+	ui.overlay = false;
 	for (let i: int32 = 0; i < ui.labelUsed.length; i += 1) { ui.labelUsed[i] = false; }
 }
 
@@ -169,8 +182,13 @@ function inside(px: float32, py: float32, x: float32, y: float32, w: float32, h:
 	return px >= x && px < x + w && py >= y && py < y + h;
 }
 
+// Everything drawn between beginOverlay and endOverlay goes on the overlay layer.
+export function beginOverlay(ui: Ui): void { ui.overlay = true; }
+export function endOverlay(ui: Ui): void { ui.overlay = false; }
+
 export function box(ui: Ui, x: float32, y: float32, w: float32, h: float32, radius: float32, color: Color): void {
-	ui.boxes.fillRoundedRect(x, y, w, h, radius, color);
+	if (ui.overlay) { ui.boxesTop.fillRoundedRect(x, y, w, h, radius, color); }
+	else { ui.boxes.fillRoundedRect(x, y, w, h, radius, color); }
 }
 
 // `align` places the text within `w`: 0 left, 0.5 centred, 1 right. void2d aligns a label
@@ -182,7 +200,7 @@ export function text(ui: Ui, id: int32, s: string, x: float32, y: float32, w: fl
 	}
 	if (at < 0) {
 		const n = label(s, size, color);
-		ui.texts.addChild(n);
+		if (ui.overlay) { ui.textsTop.addChild(n); } else { ui.texts.addChild(n); }
 		ui.labelIds.push(id);
 		ui.labelNodes.push(n);
 		ui.labelUsed.push(true);
@@ -201,12 +219,14 @@ export function text(ui: Ui, id: int32, s: string, x: float32, y: float32, w: fl
 
 // Held: the widget's own press, with the pointer still over it.
 export function held(ui: Ui, id: int32, x: float32, y: float32, w: float32, h: float32): boolean {
+	if (ui.blockBase && !ui.overlay) { return false; }
 	return ui.activeId === id && ui.down && inside(ui.x, ui.y, x, y, w, h);
 }
 
 // Claims a press that starts inside the rectangle; true in the frame the press is released
 // inside it again. Draws nothing: button() and custom widgets draw on top of it.
 export function pressable(ui: Ui, id: int32, x: float32, y: float32, w: float32, h: float32): boolean {
+	if (ui.blockBase && !ui.overlay) { return false; }
 	if (ui.pressed && inside(ui.pressX, ui.pressY, x, y, w, h)) { ui.activeId = id; }
 	if (ui.released && ui.activeId === id) {
 		ui.activeId = NO_WIDGET;
