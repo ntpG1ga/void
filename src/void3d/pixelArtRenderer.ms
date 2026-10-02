@@ -140,6 +140,8 @@ export struct PixelArtRenderer {
 	blitBlock: UniformBlock;
 	postValues: Vec<float32>;
 	blitValues: Vec<float32>;
+	// postFs glow, glowShape, glowColor, glowMist, glowVeil, glowFlat (shader3d.glsl fireGlow, mistVeil, nightFlat); all 0 is off.
+	glow: Vec<float32>;
 	postMaterial: int32;
 	blitMaterial: int32;
 	// The view the last frame drew.
@@ -182,6 +184,8 @@ const NO_VIEW: LowResView = { width: 0, height: 0, scale: 0, offsetX: 0.0, offse
 const POST_FEATURES: int32 = 12;
 const POST_DEPTH_UNPACK: int32 = 16;
 const POST_COLOR_ADJUST: int32 = 20;
+const POST_GLOW: int32 = 24;
+export const GLOW_LENGTH: int32 = 24;
 
 // Hibernal's numbers are the defaults: 360 texels across the short side (360x800 at 3x on
 // 1080x2400), outline on, palette off until one is set.
@@ -313,6 +317,7 @@ export function create(
 		blitBlock: blitBlock,
 		postValues: new Array(POST_UNIFORM_LENGTH),
 		blitValues: new Array(BLIT_UNIFORM_LENGTH),
+		glow: new Array(GLOW_LENGTH),
 		postMaterial: addMaterial(context, postMaterial),
 		blitMaterial: addMaterial(context, blitMaterial),
 		view: NO_VIEW,
@@ -323,6 +328,14 @@ export function setSettings(ref renderer: PixelArtRenderer, settings: PixelArtSe
 	renderer.settings = settings;
 	renderer.stages = planStages(settings);
 	renderer.core.changed = true;
+}
+
+// The fire's glow in the fog for the next frames: GLOW_LENGTH floats laid out as postFs glow,
+// glowShape, glowColor, glowMist, glowVeil and glowFlat. Zeros turn it off.
+export function setGlow(ref renderer: PixelArtRenderer, values: Span<float32>): void {
+	for (let i = 0; i < GLOW_LENGTH; i++) {
+		renderer.glow[i] = values[i];
+	}
 }
 
 export function setLook(ref renderer: PixelArtRenderer, look: PixelArtLook): void {
@@ -460,6 +473,9 @@ export function renderFrame(
 		depthZeroToOne(),
 		renderer.postValues,
 	);
+	for (let i = 0; i < GLOW_LENGTH; i++) {
+		renderer.postValues[POST_GLOW + i] = renderer.glow[i];
+	}
 	writeUniforms(context, renderer.postBlock, renderer.postValues);
 	view.writeBlitParams(renderer.blitValues);
 	writeUniforms(context, renderer.blitBlock, renderer.blitValues);

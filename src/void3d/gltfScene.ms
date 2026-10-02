@@ -77,5 +77,7 @@ export function addGltfNodes(
 			parents.push(id);
 		}
 	}
-	return Result.ok(count);
+	// explicit type: with void2d in the same build msc 0.2.54 infers this Result.ok as Result<uint64, int32>
+	const done: Result<int32, GltfSceneError> = Result.ok(count);
+	return done;
 }

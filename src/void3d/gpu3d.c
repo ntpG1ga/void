@@ -1,6 +1,9 @@
 #include "gpu3d.h"
 #include "../sokol/bridge.h"
 #include "../../deps/sokol/sokol_gfx.h"
+// msc caches this unit's object by this file's own text, not by the headers it includes: after
+// regenerating shader3d.glsl.h, bump this line or the old shaders stay in the build.
+// shader3d.glsl.h revision: 16 (log-distance fire falloff)
 #include "shader3d.glsl.h"
 
 // ---- enum tables, indexed by MetaScript ordinal (same order as gpu3d.ms / pass.ms) ----
@@ -14,6 +17,8 @@ static const ShaderDescription PROGRAMS[] = {
 	post_shader_desc,
 	blit_shader_desc,
 	particle_shader_desc,
+	litRamp_shader_desc,
+	billboardRamp_shader_desc,
 };
 
 // Face (h3d.mat.Data.Face without Both)
@@ -103,6 +108,13 @@ _Static_assert(sizeof(lightParams_t) == 44 * 4, "lightParams must match LIGHT_UN
 _Static_assert(sizeof(modelParams_t) == 32 * 4, "modelParams must match MODEL_LENGTH in draw.ms");
 _Static_assert(ATTR_particle_corner == ATTR_billboard_corner && ATTR_particle_root == ATTR_billboard_root
 	&& ATTR_particle_color == ATTR_billboard_shape, "particle attributes must match the Billboard layout");
+_Static_assert(ATTR_litRamp_position == ATTR_lit_position && ATTR_litRamp_normal == ATTR_lit_normal
+	&& ATTR_litRamp_color == ATTR_lit_color, "litRamp attributes must match the Lit layout");
+_Static_assert(ATTR_billboardRamp_corner == ATTR_billboard_corner && ATTR_billboardRamp_root == ATTR_billboard_root
+	&& ATTR_billboardRamp_shape == ATTR_billboard_shape, "billboardRamp attributes must match the Billboard layout");
+_Static_assert(sizeof(rampParams_t) == 32 * 4, "rampParams must match RAMP_UNIFORM_LENGTH in gpu3d.ms");
+_Static_assert(sizeof(spriteRampParams_t) == 84 * 4, "spriteRampParams must match SPRITE_RAMP_UNIFORM_LENGTH in gpu3d.ms");
+_Static_assert(sizeof(postParams_t) == 48 * 4, "postParams must match POST_UNIFORM_LENGTH in gpu3d.ms");
 
 // ---- vertex layouts, one per VertexLayout member ----
 

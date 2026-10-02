@@ -448,7 +448,9 @@ export function drawItem(
 	);
 	applyPipeline(pipeline);
 	bindItem(context, mesh, material);
-	if (material.program == Program.Lit) {
+	// The programs with a model block (binding=2). Not "declares slot 2": Billboard's sprite
+	// block sits at that slot too.
+	if (material.program == Program.Lit || material.program == Program.LitRamp) {
 		item.world.writeTo(context.model[0..MODEL_LENGTH], 0);
 		item.world.normalMatrix().writeTo(context.model[0..MODEL_LENGTH], 16);
 		applyUniforms(MODEL_SLOT, context.model[0..MODEL_LENGTH]);

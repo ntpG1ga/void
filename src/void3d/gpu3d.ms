@@ -49,6 +49,9 @@ export enum Program {
 	Post,
 	Blit,
 	Particle,
+	// Colour by ramp lookup (shader3d.glsl, "Ramp programs"): Lit's and Billboard's layouts.
+	LitRamp,
+	BillboardRamp,
 }
 
 // Vertex buffer layouts gpu3d.c knows how to describe (describeLayout).
@@ -108,8 +111,14 @@ export const TOON_UNIFORM_SLOT: int32 = 3;
 export const TOON_UNIFORM_LENGTH: int32 = 4;
 export const SPRITE_UNIFORM_SLOT: int32 = 2;
 export const SPRITE_UNIFORM_LENGTH: int32 = 8;
+// LitRamp: rampRow, rampBands, rampLight, rampMoon, rampVignette, rampFar, rampPatch (binding=3).
+// BillboardRamp: the first five, then windA..windE, spriteFar, spritePatch, spriteAccent, in its vertex stage
+// (binding=3, spriteRampParams).
+export const RAMP_UNIFORM_SLOT: int32 = 3;
+export const RAMP_UNIFORM_LENGTH: int32 = 32;
+export const SPRITE_RAMP_UNIFORM_LENGTH: int32 = 84;
 export const POST_UNIFORM_SLOT: int32 = 0;
-export const POST_UNIFORM_LENGTH: int32 = 24;
+export const POST_UNIFORM_LENGTH: int32 = 48;
 export const BLIT_UNIFORM_SLOT: int32 = 0;
 export const BLIT_UNIFORM_LENGTH: int32 = 4;
 
