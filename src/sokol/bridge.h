@@ -73,5 +73,7 @@ void voidDraw(int count);
 void voidEndPass(void);
 void voidCommit(void);
 void voidSetCommitHook(void (*fn)(void));
+void voidSkipNextCommit(void);
+void voidLoadNextPass(void);
 
 #endif

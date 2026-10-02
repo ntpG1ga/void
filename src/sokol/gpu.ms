@@ -1,5 +1,6 @@
 // Void sokol GPU — native, per-OS backend. @platform blocks pick the native deps
-// (Metal on macOS/iOS, GLES3+EGL on Android); the extern surface is backend-agnostic.
+// (Metal on macOS/iOS, GLES3+EGL on Android and Linux, D3D11 on Windows); the
+// extern surface is backend-agnostic.
 
 @passC("-I../../deps/sokol");
 @include("bridge.h");
@@ -11,11 +12,13 @@ when (macos) {
 	@passL("-framework MetalKit");
 	@link("./sokol.o");
 	@compile("./bridgeEmbed.m");
+	@compile("./pointer.c");
 }
 
 when (windows) {
 	@compile("./sokolWin.c");
 	@compile("./bridgeWin.c");
+	@compile("./pointer.c");
 	@compile("./views.c");
 	@compile("./bridge.c");
 	@passL("-ld3d11");
@@ -25,8 +28,30 @@ when (windows) {
 	@passL("-lshell32");
 }
 
+when (linux) {
+	// Project-wide, not just in the impl TU: every TU that includes sokol_gfx.h has
+	// to agree with sokolLinux.c on the backend. Without this, sokol_gfx.h defaults
+	// to GLCORE on Linux while the implementation is GLES3, and tests/capture's
+	// readback path (which keys off SOKOL_GLES3 / SOKOL_GLCORE) sees neither and
+	// compiles itself out.
+	@passC("-DSOKOL_GLES3");
+	@compile("./sokolLinux.c");
+	@compile("./bridgeLinux.c");
+	@compile("./pointer.c");
+	@compile("./bridge.c");
+	@passL("-lX11");
+	@passL("-lXi");
+	@passL("-lXcursor");
+	@passL("-lEGL");
+	@passL("-lGLESv2");
+	@passL("-ldl");
+	@passL("-lpthread");
+	@passL("-lm");
+}
+
 when (android) {
 	@compile("./bridgeAndroid.c");
+	@compile("./pointer.c");
 	@compile("./views.c");
 	@compile("./bridge.c");
 	@passL("-lEGL");
@@ -37,6 +62,7 @@ when (android) {
 
 when (ios) {
 	@compile("./bridgeIos.m");
+	@compile("./pointer.c");
 	@compile("./views.c");
 	@compile("./bridge.c");
 	@passL("-framework Metal");
@@ -85,6 +111,8 @@ extern function voidApplyMvp(mvp: Ptr<void>): void;
 extern function voidDraw(count: int32): void;
 extern function voidEndPass(): void;
 extern function voidCommit(): void;
+extern function voidSkipNextCommit(): void;
+extern function voidLoadNextPass(): void;
 extern function voidMakeRenderTarget(w: int32, h: int32): uint32;
 extern function voidRenderTargetView(rt: uint32): uint32;
 extern function voidBeginRenderTargetPass(rt: uint32, r: float32, g: float32, b: float32, a: float32): void;
@@ -109,6 +137,9 @@ export function applyMvp(mvp: Ptr<void>): void { voidApplyMvp(mvp); }
 export function draw(count: int32): void { voidDraw(count); }
 export function endPass(): void { voidEndPass(); }
 export function commit(): void { voidCommit(); }
+// HUD over a 3D frame: skip the 3D renderer's own commit, keep its image in the next 2D pass.
+export function skipNextCommit(): void { voidSkipNextCommit(); }
+export function loadNextPass(): void { voidLoadNextPass(); }
 export function makeRenderTarget(w: int32, h: int32): uint32 { return voidMakeRenderTarget(w, h); }
 export function renderTargetView(rt: uint32): uint32 { return voidRenderTargetView(rt); }
 export function beginRenderTargetPass(rt: uint32, r: float32, g: float32, b: float32, a: float32): void { voidBeginRenderTargetPass(rt, r, g, b, a); }

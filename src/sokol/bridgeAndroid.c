@@ -57,6 +57,9 @@ static void sokolSetup(void) {
 	d.environment.defaults.depth_format = SG_PIXELFORMAT_NONE;
 	d.environment.defaults.sample_count = 1;
 	d.logger.func = slog_func;
+	// A mesh is two buffers, and a glTF scene is one mesh per node: hibernal's hills, pillars,
+	// logs and walker are 64 meshes, which alone fill sokol's default pool of 128.
+	d.buffer_pool_size = 1024;
 	sg_setup(&d);
 	if (!sg_isvalid()) voidFail("sg_setup on the EGL context failed");
 }

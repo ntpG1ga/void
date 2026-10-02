@@ -130,9 +130,17 @@ int voidIsRenderTargetView(uint32_t view) {
 
 // --- Frame sequence ---
 
+// A HUD drawn over a 3D frame: the 3D renderer commits on its own, so the frame skips that
+// one commit, and the 2D pass that follows keeps the 3D image instead of clearing it.
+static int s_skipNextCommit = 0;
+static int s_loadNextPass = 0;
+void voidSkipNextCommit(void) { s_skipNextCommit = 1; }
+void voidLoadNextPass(void) { s_loadNextPass = 1; }
+
 void voidBeginPass(float r, float g, float b, float a) {
 	sg_pass pass = {0};
-	pass.action.colors[0].load_action = SG_LOADACTION_CLEAR;
+	pass.action.colors[0].load_action = s_loadNextPass ? SG_LOADACTION_LOAD : SG_LOADACTION_CLEAR;
+	s_loadNextPass = 0;
 	pass.action.colors[0].clear_value = (sg_color){r, g, b, a};
 	pass.action.depth.load_action = SG_LOADACTION_CLEAR;
 	pass.action.depth.clear_value = 1.0f;
@@ -163,6 +171,7 @@ void voidEndPass(void) { sg_end_pass(); }
 static void (*s_commitHook)(void);
 void voidSetCommitHook(void (*fn)(void)) { s_commitHook = fn; }
 void voidCommit(void) {
+	if (s_skipNextCommit) { s_skipNextCommit = 0; return; }
 	sg_commit();
 	if (s_commitHook) { s_commitHook(); }
 	voidDriverPresent();
