@@ -118,7 +118,7 @@ import {
 	labCapture,
 	labExit,
 } from "./labio.h";
-import { initHudHome, frameHudHome, takeGalleryRequest } from "./hudHome";
+import { initHudHome, frameHudHome, takeGalleryRequest } from "../ui/kit/home";
 import { initGallery, frameGallery, takeHomeRequest } from "../ui/kit/gallery";
 import { setup2d } from "../void2d/draw";
 import { skipNextCommit } from "../sokol/gpu";
