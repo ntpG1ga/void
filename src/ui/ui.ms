@@ -57,6 +57,12 @@ export interface Ui {
 	textsTop: Node2D;
 	overlay: boolean;
 	blockBase: boolean;
+	// A second finger, for pinch: tracked while the first one is down. It never presses a
+	// widget; gestures read it (down2, x2, y2).
+	secondId: int32;
+	down2: boolean;
+	x2: float32;
+	y2: float32;
 }
 
 export function createUi(clearColor: Color): Ui {
@@ -79,6 +85,7 @@ export function createUi(clearColor: Color): Ui {
 		pressed: false, pressX: 0.0, pressY: 0.0, released: false, releaseX: 0.0, releaseY: 0.0,
 		activeId: NO_WIDGET,
 		boxesTop: boxesTop, textsTop: textsTop, overlay: false, blockBase: false,
+		secondId: NO_POINTER, down2: false, x2: 0.0, y2: 0.0,
 	};
 }
 
@@ -135,12 +142,20 @@ export function beginUi(ui: Ui): void {
 					ui.pressY = ey;
 					ui.x = ex;
 					ui.y = ey;
+				} else if (ui.secondId === NO_POINTER && e.id !== ui.pointerId) {
+					ui.secondId = e.id;
+					ui.down2 = true;
+					ui.x2 = ex;
+					ui.y2 = ey;
 				}
 			},
 			PointerPhase.Move => {
 				if (e.id === ui.pointerId) {
 					ui.x = ex;
 					ui.y = ey;
+				} else if (e.id === ui.secondId) {
+					ui.x2 = ex;
+					ui.y2 = ey;
 				}
 			},
 			PointerPhase.Up => {
@@ -152,6 +167,9 @@ export function beginUi(ui: Ui): void {
 					ui.releaseY = ey;
 					ui.x = ex;
 					ui.y = ey;
+				} else if (e.id === ui.secondId) {
+					ui.secondId = NO_POINTER;
+					ui.down2 = false;
 				}
 			},
 			PointerPhase.Cancel => {
@@ -159,6 +177,10 @@ export function beginUi(ui: Ui): void {
 					ui.pointerId = NO_POINTER;
 					ui.down = false;
 					ui.activeId = NO_WIDGET;
+				}
+				if (e.id === ui.secondId) {
+					ui.secondId = NO_POINTER;
+					ui.down2 = false;
 				}
 			},
 		};
