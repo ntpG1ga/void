@@ -201,8 +201,9 @@ const LAB_FIRE_R: float32 = 16.0;
 // LAB_FIRE_R (shader3d.glsl fallShape; user, 2026-10-02: a small fire lit too much ground evenly
 // with the linear 1.0). LAB_FALL in centimetres overrides it.
 let LAB_FIRE_FALL: float32 = -0.7;
-// (1.1 while flat grass sat a step down; CLUMP_LIFT gives that step back.)
-const LAB_FIRE_GAIN: float32 = 1.0;
+// 1.1: flat grass sits a moon step down (slopeSteps), which took a band off the firelight too
+// (1.0 with GRASS_PATCHES, whose CLUMP_LIFT gives that step back).
+const LAB_FIRE_GAIN: float32 = 1.1;
 const MOON_CUT_1: float32 = 0.35;
 const MOON_CUT_2: float32 = 0.75;
 const VIGNETTE_1: float32 = 0.55;
@@ -235,9 +236,9 @@ function fractOf(v: float32): float32 {
 }
 // The ground between the blades: level with the short grass, so no ground shows anywhere (user,
 // 2026-10-01). The blades read through their lighter tips (TIP_SHARE) instead of darker gaps.
-// -1 with GRASS_PATCHES: the bare ground between the patches a step under the grass, so a
+// -1 with GRASS_PATCHES (also the fog and fire gain above, see out/tools/grassLabScene.with_patches.ms): the bare ground between the patches a step under the grass, so a
 // patch's edge shows (0 when the grass covered everything).
-const LAWN_STEPS: float32 = -1.0;
+const LAWN_STEPS: float32 = 0.0;
 // Off: each vignette ring takes a ramp step off, and away from the fire the grass has only its
 // three night steps, so under the rings the lawn and its clumps all land on the darkest one and
 // the grass reads as bare ground. 1.0 is the lab's look.
@@ -496,10 +497,10 @@ function emitterOf(state: EmitterState, seed: uint32): ParticleEmitter {
 	unreachable;
 }
 
-// The far ground sinks into the night (user, 2026-10-02, after the reference: depth reads from it).
-const FOG_START: float32 = 0.47;
-const FOG_END: float32 = 0.66;
-const FOG_STRENGTH: float32 = 0.65;
+// Far darkening; the patches trial used 0.47 / 0.66 / 0.65 (user preferred this one).
+const FOG_START: float32 = 0.5;
+const FOG_END: float32 = 0.75;
+const FOG_STRENGTH: float32 = 0.45;
 
 // The firelight in a thin fog (shader3d.glsl fireGlow): the fog the fire lights between the
 // camera and whatever a pixel shows, so the light hangs in the air round the flame and a pillar
@@ -524,7 +525,7 @@ const FOG_MIST_CELL: float32 = 0.0;
 const FOG_MIST_AMOUNT: float32 = 0.7;
 const FOG_MIST_DRIFT: float32 = 0.25;
 // The mist over the whole scene, moonlit and even: FOG_VEIL_PERCENT of the way to a pale night blue (LAB_VEIL in hundredths, 0: off). The fire's glow is added over it.
-const FOG_VEIL_PERCENT: int32 = 6;
+const FOG_VEIL_PERCENT: int32 = 12;
 const FOG_VEIL_COLOR: Vec3 = vec3(0.30, 0.33, 0.50);
 let fogVeil: float32 = 0.0;
 // At night in fog the unlit ground is low contrast: its colours pulled NIGHT_FLAT_PERCENT of the
@@ -703,7 +704,7 @@ function trackWalker(): void {
 function rampBlock(row: float32, topRow: float32, offset: float32, markOrJitter: float32, flatWalls: float32, wrap: float32, far: Vec<float32>): UniformBlock {
 	// The lawn's moon steps are cut round flat ground, as the clumps' (slopeSteps): flat ground the
 	// middle step, slopes to or from the moon the top or the bottom one.
-	const isLawn: boolean = row == ROW_GRASS && flatWalls < 0.5 && SLOPE_SHADING;
+	const isLawn: boolean = row == ROW_GRASS && flatWalls < 0.5 && SLOPE_SHADING && GRASS_PATCHES;
 	const block: UniformBlock = try reserveUniforms(context, RAMP_UNIFORM_SLOT, RAMP_UNIFORM_LENGTH)
 		catch NO_UNIFORMS;
 	const values: Vec<float32> = [
@@ -882,8 +883,8 @@ function addFlowers(root: NodeId, corners: uint32, ramps: uint32, sampler: uint3
 // mostly smooth lawn, shaded by its slopes, and the grass grows in patches whose blade-topped edges
 // follow the ground like contour lines; grass over everything hid the hills). Two octaves of value
 // noise, PATCH_NOISE_CELL metres, grass where they pass PATCH_NOISE_CUT (about PATCH share of the
-// ground). false: grass everywhere, as before.
-const GRASS_PATCHES: boolean = true;
+// ground). false: grass everywhere (user, 2026-10-02: the full cover looked better on the phone).
+const GRASS_PATCHES: boolean = false;
 // The patches a step over flat grass's (slopeSteps puts it a step under the moon's top): two over
 // the bare ground, and on slopes facing the moon past the top into the first, violet, warm step,
 // as the reference's patches stand lighter and pinker than its blue ground.
