@@ -32,6 +32,7 @@ export const WHITE: Color = rgba(1.0, 1.0, 1.0, 1.0);
 export const DIMMED: Color = rgba(0.45, 0.45, 0.45, 0.8);
 
 export interface Kit {
+	backs: Node2D;
 	frames: Node2D;
 	icons: Node2D;
 	framesTop: Node2D;
@@ -83,8 +84,11 @@ export function createKit(u: Ui): Kit {
 	u.sc.root.addChildAt(icons, 2);
 	u.sc.root.addChildAt(framesTop, 4);
 	u.sc.root.addChildAt(iconsTop, 6);
+	// under everything: full-screen fills (a screen's backdrop over the scene)
+	const backs = group();
+	u.sc.root.addChildAt(backs, 0);
 	const k: Kit = {
-		frames: frames, icons: icons, framesTop: framesTop, iconsTop: iconsTop, overlay: false,
+		backs: backs, frames: frames, icons: icons, framesTop: framesTop, iconsTop: iconsTop, overlay: false,
 		font: (shared.length as int32) > 0 ? shared[0].font : addFont(KIT_DIR + "Silkscreen-Regular.ttf"),
 		parts: (shared.length as int32) > 0 ? shared[0].parts : loadFrameParts(),
 		spriteKeys: [], spriteNodes: [], spriteUsed: [],
@@ -125,7 +129,7 @@ function place(k: Kit, layer: Node2D, key: string, view: uint32, x: float32, y: 
 	}
 	if (at < 0) {
 		const n = sprite(tile(view, w, h));
-		if (k.overlay) {
+		if (k.overlay && layer !== k.backs) {
 			if (layer === k.frames) { k.framesTop.addChild(n); } else { k.iconsTop.addChild(n); }
 		} else {
 			layer.addChild(n);
@@ -143,6 +147,20 @@ function place(k: Kit, layer: Node2D, key: string, view: uint32, x: float32, y: 
 	n.y = y;
 	n.color = tint;
 	k.spriteUsed[at] = true;
+}
+
+// ---- fills --------------------------------------------------------------------------------
+
+let whiteView: uint32 = 0 as uint32;
+
+// A flat colour rectangle on the backdrop layer, below every frame, box, icon and label: a
+// screen's backdrop over the 3D scene (a ui box would cover the screen's own frames).
+export function fill(k: Kit, id: int32, x: float32, y: float32, w: float32, h: float32, color: Color): void {
+	if (whiteView == 0) {
+		const px: uint32[] = [0xFFFFFFFF as uint32, 0xFFFFFFFF as uint32, 0xFFFFFFFF as uint32, 0xFFFFFFFF as uint32];
+		whiteView = makeTextureView(makeImage(px, 2, 2));
+	}
+	place(k, k.backs, "b" + id.toString(), whiteView, x, y, w, h, color);
 }
 
 // ---- frames -------------------------------------------------------------------------------
