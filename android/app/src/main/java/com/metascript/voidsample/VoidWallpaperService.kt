@@ -1,14 +1,28 @@
 package com.metascript.voidsample
 
 import android.service.wallpaper.WallpaperService
+import android.view.MotionEvent
 import android.view.SurfaceHolder
 
 class VoidWallpaperService : WallpaperService() {
-    override fun onCreateEngine(): Engine = VoidEngine()
+    override fun onCreateEngine(): Engine {
+        VoidNative.prepare(applicationContext)
+        return VoidEngine()
+    }
 
     private inner class VoidEngine : Engine() {
         private var width = 0
         private var height = 0
+
+        override fun onCreate(surfaceHolder: SurfaceHolder) {
+            super.onCreate(surfaceHolder)
+            setTouchEventsEnabled(true)
+        }
+
+        // Taps on the home screen reach the wallpaper too (RENDERER-BRIEF §4.1: poke the pet).
+        override fun onTouchEvent(event: MotionEvent) {
+            VoidNative.forward(event)
+        }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)

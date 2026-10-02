@@ -14,4 +14,7 @@ android {
         versionName = "0.1"
         ndk { abiFilters += "arm64-v8a" }
     }
+
+    // The engine's assets/ (font.ttf, ...) ride in the APK; VoidNative.prepare extracts them.
+    sourceSets["main"].assets.srcDir("../../assets")
 }

@@ -8,10 +8,22 @@ extern void voidViewResize(int view, int w, int h, float scale);
 extern int voidViewFrame(int view);
 extern void voidViewDestroy(int view);
 extern void voidEmbedDetach(void);
+extern void voidPointerPush(int phase, int id, float x, float y);
+extern void voidEmbedSetAssetRoot(const char *path);
 
 static int g_started = 0;
 static ANativeWindow *g_window = NULL;
 static int g_view = 0;
+
+// The dir whose assets/ holds the extracted APK assets; must be set before the first attach.
+JNIEXPORT void JNICALL
+Java_com_metascript_voidsample_VoidNative_setAssetRoot(JNIEnv *env, jobject thiz, jstring path) {
+	(void)thiz;
+	const char *p = (*env)->GetStringUTFChars(env, path, NULL);
+	if (!p) return;
+	voidEmbedSetAssetRoot(p);
+	(*env)->ReleaseStringUTFChars(env, path, p);
+}
 
 JNIEXPORT void JNICALL
 Java_com_metascript_voidsample_VoidNative_attach(JNIEnv *env, jobject thiz, jobject surface, jint width, jint height) {
@@ -34,6 +46,14 @@ JNIEXPORT void JNICALL
 Java_com_metascript_voidsample_VoidNative_frame(JNIEnv *env, jobject thiz) {
 	(void)env; (void)thiz;
 	if (g_view) voidViewFrame(g_view);
+}
+
+// Called on the UI thread, while frames run on the render thread: the pointer queue is
+// guarded (src/sokol/pointer.c), and MetaScript only reads it inside a frame.
+JNIEXPORT void JNICALL
+Java_com_metascript_voidsample_VoidNative_touch(JNIEnv *env, jobject thiz, jint phase, jint id, jfloat x, jfloat y) {
+	(void)env; (void)thiz;
+	voidPointerPush((int)phase, (int)id, (float)x, (float)y);
 }
 
 JNIEXPORT void JNICALL
