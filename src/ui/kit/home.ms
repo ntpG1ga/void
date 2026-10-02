@@ -13,6 +13,8 @@ import { FrameLook } from "./frame";
 import { button, ButtonStyle, textLink, signButton, SignState, chip, ChipKind, badge, heartPips, bar, bondingBar, balance } from "./components";
 import { Toasts, toasts, pushToast, drawToasts, tooltip, reasonPill, walletBanner, syncChip } from "./components2";
 import { sheet, sheetTop, dock, chatBubble, chatInput } from "./components3";
+import { Nav, screenFrame } from "./screens";
+import * as screens from "./screens";
 
 // ---- stand-in pet state ------------------------------------------------------------------
 
@@ -35,6 +37,8 @@ let tipText: string = "";
 let tipY: float32 = 0.0;
 let tipUntil: int32 = 0 as int32;
 let galleryAsked: boolean = false;
+let tab: Nav = Nav.Home;
+const DOCK_TABS: Nav[] = [Nav.Home, Nav.Pet, Nav.Block, Nav.Shop, Nav.Digest];
 
 enum Sheet { None, Feed, Talk }
 let openSheet: Sheet = Sheet.None;
@@ -113,7 +117,7 @@ function badges(u: Ui, k: Kit): void {
 	// gear: 48 target round the 36 box
 	badgeFrame(k, 40, 308.0, 34.0, 36.0, 41);
 	icon(k, 40, "gear", 316.0, 42.0, 20.0);
-	if (pressable(u, 40, 300.0, 28.0, 52.0, 48.0)) { galleryAsked = true; }
+	if (pressable(u, 40, 300.0, 28.0, 52.0, 48.0)) { tab = Nav.Settings; }
 	const glyphs: string[] = ["winter", "growth", "insured"];
 	const numbers: string[] = ["12", "X1.1", ""];
 	const tips: string[] = ["WINTER IN 12 DAYS - EMISSION X0.75", "GROWTH X1.10 - 18H LEFT", "INSURED - REVIVES ONCE AT 3 HEARTS"];
@@ -219,7 +223,26 @@ export function frameHudHome(): void {
 	beginUi(u);
 	beginKit(k);
 	tick += 1;
-	u.blockBase = openSheet != Sheet.None;
+	u.blockBase = openSheet != Sheet.None || (tab != Nav.Home && screens.overlayOpen);
+
+	if (tab != Nav.Home) {
+		screens.navigate = Nav.Stay;
+		screenFrame(u, k, queue, tab, tick);
+		drawToasts(u, k, 60, queue, 16.0, 676.0, 328.0);
+		if (tab != Nav.Settings) {
+			let active: int32 = 0 as int32;
+			for (let i: int32 = 0; i < 5; i += 1) { if (DOCK_TABS[i] == tab) { active = i; } }
+			const d: int32 = dock(u, k, 80, active, true, 31);
+			if (d >= 0) { tab = DOCK_TABS[d]; }
+		}
+		const go: Nav = screens.navigate;
+		if (go == Nav.Gallery) { galleryAsked = true; tab = Nav.Home; }
+		else if (go != Nav.Stay) { tab = go; }
+		endKit(k);
+		loadNextPass();
+		endUi(u);
+		return;
+	}
 
 	// a tap on the scene collapses the expanded card
 	if (tick < expandedUntil && u.released && u.releaseY > 260.0 && u.releaseY < 600.0) { expandedUntil = 0; }
@@ -232,10 +255,7 @@ export function frameHudHome(): void {
 	if (button(u, k, 71, 188.0, 668.0, 156.0, 48.0, "TALK " + talks.toString() + "/" + MAX_TALKS.toString(),
 		ButtonStyle.Primary, true, 22)) { openSheet = Sheet.Talk; }
 	const d: int32 = dock(u, k, 80, 0 as int32, true, 31);
-	if (d > 0) {
-		const names: string[] = ["HOME", "PET", "BLOCK", "SHOP", "DIGEST"];
-		pushToast(queue, names[d] + " - NOT BUILT YET", false);
-	}
+	if (d > 0) { tab = DOCK_TABS[d]; }
 
 	// sheet on the overlay
 	const target: float32 = openSheet != Sheet.None ? 1.0 : 0.0;
