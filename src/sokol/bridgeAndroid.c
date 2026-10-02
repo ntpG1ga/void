@@ -60,6 +60,9 @@ static void sokolSetup(void) {
 	// A mesh is two buffers, and a glTF scene is one mesh per node: hibernal's hills, pillars,
 	// logs and walker are 64 meshes, which alone fill sokol's default pool of 128.
 	d.buffer_pool_size = 1024;
+	// the UI kit makes a texture per frame size + seed + look and one per icon
+	d.image_pool_size = 1024;
+	d.view_pool_size = 1024;
 	sg_setup(&d);
 	if (!sg_isvalid()) voidFail("sg_setup on the EGL context failed");
 }
