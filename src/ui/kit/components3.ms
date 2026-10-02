@@ -257,14 +257,27 @@ const NODE_SHAPE: string[] = ["Small", "Notable", "Keystone"];
 const NODE_STATE: string[] = ["Allocated", "Reachable", "Locked"];
 
 export function treeNode(u: Ui, k: Kit, id: int32, cx: float32, cy: float32, shape: NodeShape, state: NodeState): boolean {
-	const tapped: boolean = pressable(u, id, cx - 24.0, cy - 24.0, 48.0, 48.0);
-	const size: float32 = NODE_SIZE[shape as int32];
+	return treeNodeScaled(u, k, id, cx, cy, shape, state, 1.0);
+}
+
+// The same at `scale` (the tree's zoom): the sprite and its touch target grow with it.
+export function treeNodeScaled(u: Ui, k: Kit, id: int32, cx: float32, cy: float32, shape: NodeShape, state: NodeState,
+	scale: float32): boolean {
+	const t: float32 = 48.0 * (scale > 1.0 ? scale : 1.0);
+	const tapped: boolean = pressable(u, id, cx - t * HALF, cy - t * HALF, t, t);
+	const size: float32 = NODE_SIZE[shape as int32] * scale;
 	icon(k, id, "node" + NODE_SHAPE[shape as int32] + NODE_STATE[state as int32], cx - size * HALF, cy - size * HALF, size);
 	return tapped;
 }
 
 // A link between two nodes: thin ash, or thick ember when both ends are allocated.
 export function treeLink(u: Ui, x0: float32, y0: float32, x1: float32, y1: float32, allocated: boolean): void {
+	treeLinkIn(u, x0, y0, x1, y1, allocated, 0.0, 0.0, 360.0, 800.0);
+}
+
+// The same, drawn only where it lies inside the clip rectangle (the tree's frame).
+export function treeLinkIn(u: Ui, x0: float32, y0: float32, x1: float32, y1: float32, allocated: boolean,
+	clipX: float32, clipY: float32, clipW: float32, clipH: float32): void {
 	const dx: float32 = x1 - x0;
 	const dy: float32 = y1 - y0;
 	const adx: float32 = dx < 0.0 ? -dx : dx;
@@ -275,6 +288,7 @@ export function treeLink(u: Ui, x0: float32, y0: float32, x1: float32, y1: float
 		const f: float32 = steps == 0 ? 0.0 : (i as float32) / (steps as float32);
 		const px: float32 = x0 + dx * f;
 		const py: float32 = y0 + dy * f;
+		if (px < clipX + 2.0 || py < clipY + 2.0 || px > clipX + clipW - 2.0 || py > clipY + clipH - 2.0) { continue; }
 		if (allocated) {
 			box(u, px - 2.0, py - 2.0, 4.0, 4.0, 0.0, rgba(0.969, 0.549, 0.227, 0.18));
 			box(u, px - 1.0, py - 1.0, 2.0, 2.0, 0.0, EMBER_HOT);
