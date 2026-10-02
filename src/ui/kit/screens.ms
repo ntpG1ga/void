@@ -14,7 +14,7 @@ import { button, ButtonStyle, textLink, signButton, SignState, chip, ChipKind, h
 	Rarity, rarityColor, rarityName, rarityBorder, GROWTH_GREEN } from "./components";
 import { Toasts, pushToast, toggle, ToggleState, segmented, tabs, radioRow, listRow, RowKind, sectionHeader, labelDivider,
 	lightFrame, emptyState } from "./components2";
-import { sheet, sheetTop, modal, ModalAnswer, pager, lineageEntry, LineageState, treeNode, treeLink, NodeShape, NodeState,
+import { sheet, sheetTop, modal, ModalAnswer, pager, lineageEntry, LineageState, treeNodeScaled, treeLinkIn, NodeShape, NodeState,
 	oddsBlock, OddsState } from "./components3";
 
 export enum Nav { Stay, Home, Pet, Block, Shop, Digest, Settings, Gallery }
@@ -325,22 +325,138 @@ const T_NAME: string[] = ["GATE", "IRON HIDE", "QUICK HANDS", "DEEP POCKETS", "B
 const T_EFFECT: string[] = ["START", "+6% GRIT", "+4% SPEED", "+6% FORAGE", "+10% MIGHT", "+5% LOOT", "+6% FORAGE",
 	"+8% ACCURACY", "+10% STORE", "+20% MIGHT", "+15% ARMOR", "+25% FORAGE", "WIN = HEAL 1 HEART", "REVIVE AT 1 HEART"];
 
+// pan and zoom: screen = TREE_O + (world - TREE_W) * zoom + pan
+const CLIP_X: float32 = 26.0;
+const CLIP_Y: float32 = 156.0;
+const CLIP_W: float32 = 308.0;
+const CLIP_H: float32 = 528.0;
+const TREE_OX: float32 = 180.0;
+const TREE_OY: float32 = 420.0;
+const TREE_WX: float32 = 180.0;
+const TREE_WY: float32 = 480.0;
+const ZOOM_MIN: float32 = 0.7;
+const ZOOM_MAX: float32 = 2.6;
+let zoom: float32 = 1.0;
+let panX: float32 = 0.0;
+let panY: float32 = 0.0;
+let recentering: boolean = false;
+// the gesture in progress
+let gestureOn: boolean = false;
+let pinching: boolean = false;
+let moved: float32 = 0.0;
+let startPanX: float32 = 0.0;
+let startPanY: float32 = 0.0;
+let startZoom: float32 = 1.0;
+let startDist: float32 = 1.0;
+let anchorX: float32 = 0.0;   // the world point under the pinch's midpoint
+let anchorY: float32 = 0.0;
+let lastX: float32 = 0.0;
+let lastY: float32 = 0.0;
+
+function inTree(x: float32, y: float32): boolean {
+	return x >= CLIP_X && x < CLIP_X + CLIP_W && y >= CLIP_Y && y < CLIP_Y + CLIP_H;
+}
+
+function screenX(wx: float32): float32 { return TREE_OX + (wx - TREE_WX) * zoom + panX; }
+function screenY(wy: float32): float32 { return TREE_OY + (wy - TREE_WY) * zoom + panY; }
+
+function sqrtOf(v: float32): float32 {
+	if (v <= 0.0) { return 0.0; }
+	let r: float32 = v > 1.0 ? v : 1.0;
+	for (let i: int32 = 0; i < 12; i += 1) { r = (r + v / r) * 0.5; }
+	return r;
+}
+
+// One finger pans, two pinch (the point between them stays put). Any movement past a few
+// units makes the gesture a drag: its release is not a tap on a node.
+function treeGesture(u: Ui): void {
+	if (u.pressed && inTree(u.pressX, u.pressY)) {
+		gestureOn = true;
+		pinching = false;
+		moved = 0.0;
+		startPanX = panX;
+		startPanY = panY;
+		lastX = u.pressX;
+		lastY = u.pressY;
+		recentering = false;
+	}
+	if (!gestureOn) { return; }
+	if (u.down && u.down2) {
+		const dx: float32 = u.x2 - u.x;
+		const dy: float32 = u.y2 - u.y;
+		const dist: float32 = sqrtOf(dx * dx + dy * dy);
+		const mx: float32 = (u.x + u.x2) * 0.5;
+		const my: float32 = (u.y + u.y2) * 0.5;
+		if (!pinching) {
+			pinching = true;
+			startDist = dist < 1.0 ? 1.0 : dist;
+			startZoom = zoom;
+			anchorX = (mx - TREE_OX - panX) / zoom + TREE_WX;
+			anchorY = (my - TREE_OY - panY) / zoom + TREE_WY;
+			moved = 99.0;
+		}
+		let z: float32 = startZoom * dist / startDist;
+		if (z < ZOOM_MIN) { z = ZOOM_MIN; }
+		if (z > ZOOM_MAX) { z = ZOOM_MAX; }
+		zoom = z;
+		panX = mx - TREE_OX - (anchorX - TREE_WX) * zoom;
+		panY = my - TREE_OY - (anchorY - TREE_WY) * zoom;
+	} else if (u.down) {
+		if (pinching) {
+			// back to one finger: carry on panning from here
+			pinching = false;
+			startPanX = panX - (u.x - u.pressX);
+			startPanY = panY - (u.y - u.pressY);
+		}
+		panX = startPanX + (u.x - u.pressX);
+		panY = startPanY + (u.y - u.pressY);
+		const sx: float32 = u.x - lastX;
+		const sy: float32 = u.y - lastY;
+		moved += (sx < 0.0 ? -sx : sx) + (sy < 0.0 ? -sy : sy);
+		lastX = u.x;
+		lastY = u.y;
+	}
+	// keep some of the tree on screen
+	const limit: float32 = 220.0 * zoom;
+	if (panX > limit) { panX = limit; }
+	if (panX < -limit) { panX = -limit; }
+	if (panY > limit) { panY = limit; }
+	if (panY < -limit) { panY = -limit; }
+}
+
 function petTree(u: Ui, k: Kit): void {
 	say(u, k, 3500, "POINTS: 2 UNSPENT - 18/30 USED", 16.0, 112.0, 328.0, 8.0, INK, 0.0);
 	say(u, k, 3501, "WINTER REFUND: 3 AVAILABLE", 16.0, 128.0, 328.0, 8.0, INK_MUTED, 0.0);
 	frame(k, 3502, 16.0, 146.0, 328.0, 548.0, 64, FrameLook.Normal);
-	say(u, k, 3503, "FIGHTER", 150.0, 270.0, 60.0, 8.0, INK_MUTED, 0.5);
+	if (treeSelected < 0) { treeGesture(u); }
+	if (recentering) {
+		zoom = zoom + (1.0 - zoom) * 0.2;
+		panX = panX * 0.8;
+		panY = panY * 0.8;
+		const off: float32 = (panX < 0.0 ? -panX : panX) + (panY < 0.0 ? -panY : panY) + (zoom > 1.0 ? zoom - 1.0 : 1.0 - zoom) * 100.0;
+		if (off < 0.5) { recentering = false; zoom = 1.0; panX = 0.0; panY = 0.0; }
+	}
+	const lx: float32 = screenX(180.0);
+	const ly: float32 = screenY(270.0);
+	if (inTree(lx, ly)) { say(u, k, 3503, "FIGHTER", lx - 40.0, ly, 80.0, 8.0, INK_MUTED, 0.5); }
 	for (let i: int32 = 0; i < T_LINK.length; i += 2) {
 		const a: int32 = T_LINK[i];
 		const b: int32 = T_LINK[i + 1];
-		treeLink(u, T_X[a], T_Y[a], T_X[b], T_Y[b], T_STATE[a] == NodeState.Allocated && T_STATE[b] == NodeState.Allocated);
+		treeLinkIn(u, screenX(T_X[a]), screenY(T_Y[a]), screenX(T_X[b]), screenY(T_Y[b]),
+			T_STATE[a] == NodeState.Allocated && T_STATE[b] == NodeState.Allocated, CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
 	}
+	const dragged: boolean = moved > 8.0;
 	for (let i: int32 = 0; i < T_X.length; i += 1) {
-		if (treeNode(u, k, 3510 + i, T_X[i], T_Y[i], T_SHAPE[i], T_STATE[i])) { treeSelected = i; }
+		const nx: float32 = screenX(T_X[i]);
+		const ny: float32 = screenY(T_Y[i]);
+		const r: float32 = 13.0 * zoom;
+		if (nx - r < CLIP_X || ny - r < CLIP_Y || nx + r > CLIP_X + CLIP_W || ny + r > CLIP_Y + CLIP_H) { continue; }
+		if (treeNodeScaled(u, k, 3510 + i, nx, ny, T_SHAPE[i], T_STATE[i], zoom) && !dragged) { treeSelected = i; }
 	}
 	icon(k, 3530, "recenter", 306.0, 656.0, 26.0);
-	// legend
-	say(u, k, 3531, "FILLED = TAKEN  RING = REACHABLE  GREY = LOCKED", 16.0, 706.0, 328.0, 8.0, INK_MUTED, 0.5);
+	if (pressable(u, 3531, 296.0, 646.0, 48.0, 48.0)) { recentering = true; }
+	if (!u.down) { gestureOn = false; }
+	say(u, k, 3532, "DRAG TO PAN - PINCH TO ZOOM", 16.0, 706.0, 328.0, 8.0, INK_MUTED, 0.5);
 }
 
 function treeSheet(u: Ui, k: Kit): void {
