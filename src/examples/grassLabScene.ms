@@ -118,8 +118,6 @@ import {
 	labCapture,
 	labExit,
 } from "./labio.h";
-import { initHudHome, frameHudHome, takeGalleryRequest } from "../ui/kit/home";
-import { initGallery, frameGallery, takeHomeRequest } from "../ui/kit/gallery";
 import { setup2d } from "../void2d/draw";
 import { skipNextCommit } from "../sokol/gpu";
 
@@ -1744,10 +1742,18 @@ function setup(): boolean {
 	return true;
 }
 
-// The Hibernal HUD over the scene: LAB_HUD=1 the Home screen (hudHome.ms), 2 the UI kit
-// gallery (ui/kit/gallery.ms), 0 none.
-let hudWanted: boolean = true;
-let hudMode: int32 = 1 as int32;
+// A HUD drawn over the scene, set by the app's entry before the scene starts (the game's HUD
+// lives with the game); LAB_HUD=0 turns it off.
+function noHud(): void {}
+let hudWanted: boolean = false;
+let hudInit: () => void = noHud;
+let hudFrame: () => void = noHud;
+
+export function setLabHud(init: () => void, frame: () => void): void {
+	hudInit = init;
+	hudFrame = frame;
+	hudWanted = true;
+}
 
 export function initLab(): void {
 	gfxSetup();
@@ -1758,8 +1764,7 @@ export function initLab(): void {
 	rampLook = labEnvInt("LAB_RAMP", 1) != 0;
 	walkerWanted = labEnvInt("LAB_WALKER", 1) != 0;
 	particlesWanted = labEnvInt("LAB_PARTICLES", 1) != 0;
-	hudMode = labEnvInt("LAB_HUD", 1);
-	hudWanted = hudMode != 0;
+	hudWanted = hudWanted && labEnvInt("LAB_HUD", 1) != 0;
 	snowWanted = labEnvInt("LAB_SNOW", 0) != 0;
 	walkerFx = labEnvInt("LAB_WALKER_FX", 1) != 0;
 	zoomOut = (labEnvInt("LAB_ZOOM", DEFAULT_ZOOM) as float32) / 100.0;
@@ -1777,8 +1782,7 @@ export function initLab(): void {
 	// after the scene: its gfxSetup is done and the HUD's assets load inside the asset root
 	if (ready && hudWanted) {
 		setup2d();
-		initHudHome();
-		initGallery();
+		hudInit();
 	}
 }
 
@@ -1940,13 +1944,7 @@ export function frameLab(): void {
 	}
 	if (hudWanted) { skipNextCommit(); }
 	renderFrame(renderer, context, sceneItems, cameraParams, lightParams, shifted.value);
-	if (hudMode == 1) {
-		frameHudHome();
-		if (takeGalleryRequest()) { hudMode = 2 as int32; }
-	} else if (hudMode == 2) {
-		frameGallery();
-		if (takeHomeRequest()) { hudMode = 1 as int32; }
-	}
+	if (hudWanted) { hudFrame(); }
 
 	if (captureAt >= 0) {
 		const out: string = "out/shots/";
