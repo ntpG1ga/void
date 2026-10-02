@@ -61,6 +61,10 @@ export interface Ui {
 	// widget; gestures read it (down2, x2, y2).
 	secondId: int32;
 	down2: boolean;
+	// Base-layer widgets only take presses that start between clipTop and clipBottom (a
+	// scrolling area sets them; overlay widgets ignore them).
+	clipTop: float32;
+	clipBottom: float32;
 	x2: float32;
 	y2: float32;
 }
@@ -85,7 +89,7 @@ export function createUi(clearColor: Color): Ui {
 		pressed: false, pressX: 0.0, pressY: 0.0, released: false, releaseX: 0.0, releaseY: 0.0,
 		activeId: NO_WIDGET,
 		boxesTop: boxesTop, textsTop: textsTop, overlay: false, blockBase: false,
-		secondId: NO_POINTER, down2: false, x2: 0.0, y2: 0.0,
+		secondId: NO_POINTER, down2: false, x2: 0.0, y2: 0.0, clipTop: 0.0, clipBottom: DESIGN_H,
 	};
 }
 
@@ -188,6 +192,8 @@ export function beginUi(ui: Ui): void {
 	ui.boxes.clear();
 	ui.boxesTop.clear();
 	ui.overlay = false;
+	ui.clipTop = 0.0;
+	ui.clipBottom = DESIGN_H;
 	for (let i: int32 = 0; i < ui.labelUsed.length; i += 1) { ui.labelUsed[i] = false; }
 }
 
@@ -247,9 +253,15 @@ export function held(ui: Ui, id: int32, x: float32, y: float32, w: float32, h: f
 
 // Claims a press that starts inside the rectangle; true in the frame the press is released
 // inside it again. Draws nothing: button() and custom widgets draw on top of it.
+const DRAGGED: int32 = -2 as int32;
+
+// The press became a drag (a scroll): no widget takes its release.
+export function cancelPress(ui: Ui): void { ui.activeId = DRAGGED; }
+
 export function pressable(ui: Ui, id: int32, x: float32, y: float32, w: float32, h: float32): boolean {
 	if (ui.blockBase && !ui.overlay) { return false; }
-	if (ui.pressed && inside(ui.pressX, ui.pressY, x, y, w, h)) { ui.activeId = id; }
+	const clipped: boolean = !ui.overlay && (ui.pressY < ui.clipTop || ui.pressY >= ui.clipBottom);
+	if (ui.pressed && !clipped && inside(ui.pressX, ui.pressY, x, y, w, h)) { ui.activeId = id; }
 	if (ui.released && ui.activeId === id) {
 		ui.activeId = NO_WIDGET;
 		return inside(ui.releaseX, ui.releaseY, x, y, w, h);
